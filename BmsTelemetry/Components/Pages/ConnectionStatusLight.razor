@@ -1,0 +1,15 @@
+<span class="@CssClass"></span>
+
+@code {
+    [Parameter] public ConnectionStatus Status { get; set; }
+
+    private string CssClass => Status switch
+    {
+        ConnectionStatus.Connected => "status-dot green",
+        ConnectionStatus.Connecting => "status-dot yellow",
+        ConnectionStatus.Disconnected => "status-dot red",
+        ConnectionStatus.Disconnecting => "status-dot yellow",
+        ConnectionStatus.Unknown => "status-dot gray",
+        _ => "status-dot gray"
+    };
+}

@@ -1,6 +1,7 @@
 <div class="card">
-    <p>BMS IP address: @BmsHandler.DeviceIP</p>
-    <p>Connection status: @BmsHandler.Connection</p>
+    <div><ConnectionStatusLight Status="@BmsHandler.Connection" /> Connection: @BmsHandler.Connection</div>
+    <p>IP: @BmsHandler.DeviceIP</p>
+
 </div>
 
 @code {
