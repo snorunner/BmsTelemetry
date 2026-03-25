@@ -9,7 +9,7 @@ public static class SettingsExtensions
         // Bind strongly-typed settings
         services.Configure<AzureSettings>(config.GetSection("AzureSettings"));
         services.Configure<GeneralSettings>(config.GetSection("GeneralSettings"));
-        // services.Configure<NetworkSettings>(config.GetSection("NetworkSettings"));
+        services.Configure<NetworkSettings>(config.GetSection("NetworkSettings"));
         services.Configure<LoggingSettings>(config.GetSection("LoggingSettings"));
     }
 }
