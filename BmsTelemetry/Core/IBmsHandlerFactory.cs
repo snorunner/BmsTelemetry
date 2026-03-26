@@ -3,7 +3,7 @@ public static class IBmsHandlerFactory
     public static IBmsHandler Create(DeviceSettings deviceSettings, GeneralSettings generalSettings)
     {
         var client = IBmsHandlerFactory.GetClientForSettings(deviceSettings, generalSettings);
-        return new BmsHandler(deviceSettings, client);
+        return new BmsHandler(deviceSettings, generalSettings, client);
     }
 
     private static IBmsClient GetClientForSettings(DeviceSettings deviceSettings, GeneralSettings generalSettings)

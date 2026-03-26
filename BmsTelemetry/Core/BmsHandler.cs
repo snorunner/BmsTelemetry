@@ -1,48 +1,91 @@
 public class BmsHandler : IBmsHandler
 {
+    private readonly object _stateLock = new();
+
     public string DeviceIP { get; init; }
     public BmsType DeviceType { get; init; }
-    public ConnectionStatus Connection { get; set; }
-    public BmsHandlerStatus Status { get; set; }
-    public DateTime LastSuccess { get; set; }
-    public DateTime LastFailure { get; set; }
-    public int ConsecutiveFailures { get; set; }
+
+    public ConnectionStatus Connection { get; private set; } = ConnectionStatus.Unknown;
+    public BmsHandlerStatus Status { get; private set; } = BmsHandlerStatus.Idle;
+
+    public int ConsecutiveFailures { get; private set; }
+    public DateTime LastSuccess { get; private set; } = DateTime.MinValue;
+    public DateTime LastFailure { get; private set; } = DateTime.MinValue;
 
     private readonly IBmsClient _bmsClient;
+    private readonly GeneralSettings _generalSettings;
 
-    public BmsHandler(DeviceSettings deviceSettings, IBmsClient bmsClient)
+    public BmsHandler(DeviceSettings deviceSettings, GeneralSettings generalSettings, IBmsClient bmsClient)
     {
         DeviceIP = deviceSettings.IP;
         DeviceType = deviceSettings.device_type;
-        Connection = ConnectionStatus.Unknown;
-        Status = BmsHandlerStatus.Idle;
-        LastSuccess = DateTime.MinValue;
-        LastFailure = DateTime.MinValue;
-        ConsecutiveFailures = 0;
-
         _bmsClient = bmsClient;
+        _generalSettings = generalSettings;
 
+        // Subscribe to client status updates
         if (_bmsClient is BaseDeviceClient client)
         {
-            client.OnStatusChanged += update =>
-            {
-                Connection = update.Connection;
-                LastSuccess = update.LastSuccess;
-                LastFailure = update.LastFailure;
-                ConsecutiveFailures = update.ConsecutiveFailures;
-            };
+            client.OnStatusChanged += UpdateStatus;
+        }
+    }
+
+    private void UpdateStatus(ClientStatusUpdate update)
+    {
+        lock (_stateLock)
+        {
+            Connection = update.Connection;
+            LastSuccess = update.LastSuccess;
+            LastFailure = update.LastFailure;
+            ConsecutiveFailures = update.ConsecutiveFailures;
+
+            // Map client state to simplified handler state
+            Status = update.Connection == ConnectionStatus.Connected
+                ? BmsHandlerStatus.Polling
+                : BmsHandlerStatus.Idle;
         }
     }
 
     public async Task StartAsync(CancellationToken ct = default)
     {
+        lock (_stateLock)
+        {
+            if (Status == BmsHandlerStatus.Polling)
+                return; // already running
+        }
         await _bmsClient.StartAsync(ct);
-        Status = BmsHandlerStatus.Polling;
+        lock (_stateLock)
+        {
+            Status = BmsHandlerStatus.Polling;
+        }
     }
 
     public async Task StopAsync()
     {
         await _bmsClient.StopAsync();
-        Status = BmsHandlerStatus.Stopped;
+        lock (_stateLock)
+        {
+            Status = BmsHandlerStatus.Stopped;
+        }
+    }
+
+    // Called by supervisor/background service to apply smart conditions
+    public async Task EvaluateAsync(CancellationToken ct)
+    {
+        lock (_stateLock)
+        {
+            // Stop if too many consecutive failures
+            if (ConsecutiveFailures >= 5 && Status == BmsHandlerStatus.Polling)
+            {
+                _ = StopAsync(); // fire-and-forget safe here
+                return;
+            }
+
+            // Restart if stopped/idle and last failure was > 30 min ago
+            if ((Status == BmsHandlerStatus.Stopped || Status == BmsHandlerStatus.Idle) &&
+                (DateTime.UtcNow - LastFailure) > TimeSpan.FromMinutes(30))
+            {
+                _ = StartAsync(ct);
+            }
+        }
     }
 }
