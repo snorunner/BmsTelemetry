@@ -17,20 +17,20 @@ public static class IBmsHandlerFactory
                         generalSettings
                     )
                 );
-            // case BmsType.Danfoss:
-            //     return new DanfossDeviceClient(
-            //         new BmsHttpTransport(
-            //             new Uri($"http://{deviceSettings.IP}/http/xml.cgi"),
-            //             generalSettings
-            //         )
-            //     );
-            // case BmsType.EmersonE3:
-            //     return new E3DeviceClient(
-            //         new BmsHttpTransport(
-            //             new Uri($"http://{deviceSettings.IP}/cgi-bin/mgw.cgi"),
-            //             generalSettings
-            //         )
-            //     );
+            case BmsType.Danfoss:
+                return new DanfossDeviceClient(
+                    new BmsHttpTransport(
+                        new Uri($"http://{deviceSettings.IP}/http/xml.cgi"),
+                        generalSettings
+                    )
+                );
+            case BmsType.EmersonE3:
+                return new E3DeviceClient(
+                    new BmsHttpTransport(
+                        new Uri($"http://{deviceSettings.IP}/cgi-bin/mgw.cgi"),
+                        generalSettings
+                    )
+                );
             default:
                 throw new NotImplementedException($"Device type {deviceSettings.device_type} is not implemented!");
         }

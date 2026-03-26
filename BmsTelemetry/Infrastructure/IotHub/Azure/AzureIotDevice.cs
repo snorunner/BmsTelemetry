@@ -39,10 +39,12 @@ public sealed class AzureIotDevice : IIotDevice, IAsyncDisposable
                 return;
             }
 
+            Connected = ConnectionStatus.Connecting;
             _deviceClient ??= await _dpsService.ProvisionDeviceAsync();
 
             await _deviceClient.OpenAsync(ct);
             _logger.LogInformation("Azure IoT device has been connected successfully.");
+            Connected = ConnectionStatus.Connected;
         }
         finally
         {

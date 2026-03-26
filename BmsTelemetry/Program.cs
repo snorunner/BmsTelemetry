@@ -19,6 +19,9 @@ builder.Services.AddSingleton<CertificateProvider>();
 builder.Services.AddSingleton<KeyvaultService>();
 builder.Services.AddSingleton<DpsService>();
 
+// Workers
+builder.Services.AddHostedService<BmsSupervisor>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

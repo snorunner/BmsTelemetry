@@ -28,5 +28,12 @@ public abstract class BaseDeviceClient : IBmsClient
             await _executionTask;
     }
 
+    public event Action<ClientStatusUpdate>? OnStatusChanged;
+
+    protected void RaiseStatus(ClientStatusUpdate update)
+    {
+        OnStatusChanged?.Invoke(update);
+    }
+
     protected abstract Task RunAsync(CancellationToken ct);
 }
