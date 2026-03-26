@@ -2,8 +2,8 @@ public class BmsHandler : IBmsHandler
 {
     public string DeviceIP { get; init; }
     public BmsType DeviceType { get; init; }
-    public ConnectionStatus Connection { get; init; }
-    public BmsHandlerStatus Status { get; init; }
+    public ConnectionStatus Connection { get; set; }
+    public BmsHandlerStatus Status { get; set; }
 
     private readonly IBmsClient _bmsClient;
 
@@ -17,13 +17,13 @@ public class BmsHandler : IBmsHandler
         _bmsClient = bmsClient;
     }
 
-    public void Start()
+    public async Task StartAsync(CancellationToken ct = default)
     {
-        _bmsClient.Start();
+        await _bmsClient.StartAsync(ct);
     }
 
-    public void Stop()
+    public async Task StopAsync()
     {
-        _bmsClient.Stop();
+        await _bmsClient.StopAsync();
     }
 }

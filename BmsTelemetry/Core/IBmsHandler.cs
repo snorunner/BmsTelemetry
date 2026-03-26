@@ -2,10 +2,10 @@ public interface IBmsHandler
 {
     string DeviceIP { get; init; }
     BmsType DeviceType { get; init; }
-    ConnectionStatus Connection { get; init; }
-    BmsHandlerStatus Status { get; init; }
+    ConnectionStatus Connection { get; set; }
+    BmsHandlerStatus Status { get; set; }
 
-    void Start();
+    Task StartAsync(CancellationToken ct);
 
-    void Stop();
+    Task StopAsync();
 }

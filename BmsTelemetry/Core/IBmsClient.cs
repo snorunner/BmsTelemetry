@@ -1,6 +1,5 @@
 public interface IBmsClient
 {
-    void Start();
-
-    void Stop();
+    Task StartAsync(CancellationToken ct);
+    Task StopAsync();
 }

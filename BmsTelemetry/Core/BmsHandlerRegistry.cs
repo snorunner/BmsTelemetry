@@ -4,13 +4,14 @@ public class BmsHandlerRegistry : IBmsHandlerRegistry
 {
     private Dictionary<string, IBmsHandler> bmsHandlers = new();
 
-    public BmsHandlerRegistry(IOptions<NetworkSettings> networkSettings)
+    public BmsHandlerRegistry(IOptions<NetworkSettings> networkSettings, IOptions<GeneralSettings> generalSettings)
     {
         var netsettings = networkSettings.Value.bms_devices;
+        var gensettings = generalSettings.Value;
 
         foreach (var entry in netsettings)
         {
-            var handler = IBmsHandlerFactory.Create(entry);
+            var handler = IBmsHandlerFactory.Create(entry, gensettings);
             RegisterDevice(handler);
         }
     }
