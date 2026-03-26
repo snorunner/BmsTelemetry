@@ -19,6 +19,7 @@ builder.Services.AddSingleton<IBmsHandlerRegistry, BmsHandlerRegistry>();
 builder.Services.AddSingleton<CertificateProvider>();
 builder.Services.AddSingleton<KeyvaultService>();
 builder.Services.AddSingleton<DpsService>();
+builder.Services.AddSingleton<UptimeService>();
 
 // Workers
 builder.Services.AddHostedService<BmsSupervisor>();

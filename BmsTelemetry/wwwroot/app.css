@@ -77,8 +77,14 @@ h1:focus {
     padding: 16px;
     border: 1px solid #444;
     border-radius: 8px;
-    background: #1e1e1e;
+    background-color: #2c2c2c;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     color: white;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
 }
 
 .status-dot {
@@ -94,14 +100,6 @@ h1:focus {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 16px;
-}
-
-.card {
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #333;
-    background-color: #1e1e1e;
-    color: white;
 }
 
 .green {

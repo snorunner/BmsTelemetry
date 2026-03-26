@@ -1,5 +1,9 @@
 ﻿@page "/"
 @inject IBmsHandlerRegistry BmsHandlerRegistry
+@inject IIotDevice IotDevice
+@inject UptimeService UptimeService
+
+<h3>System Uptime: @UptimeText</h3>
 
 <h3>BMS Network</h3>
 
@@ -17,11 +21,37 @@ else
     </div>
 }
 
+<h3>Azure Information</h3>
+
+<div class="grid">
+    <IotDeviceCard IotDevice="IotDevice" />
+</div>
+
 @code {
     private IReadOnlyCollection<IBmsHandler>? handlers;
+
+    private string UptimeText = "Loading...";
+    private Timer? _timer;
 
     protected override void OnInitialized()
     {
         handlers = BmsHandlerRegistry.GetHandlers();
+
+        _timer = new Timer(_ => 
+            {
+                UpdateUptime();
+                InvokeAsync(StateHasChanged);
+            }, null, 0, 1000);
+    }
+
+    private void UpdateUptime()
+    {
+        var ts = UptimeService.GetUptime();
+        UptimeText = $"{ts:hh\\:mm\\:ss}";
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
     }
 }

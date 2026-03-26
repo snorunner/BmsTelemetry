@@ -16,6 +16,8 @@ public class BmsHandler : IBmsHandler
     private readonly IBmsClient _bmsClient;
     private readonly GeneralSettings _generalSettings;
 
+    public event Action? OnStatusChanged;
+
     public BmsHandler(DeviceSettings deviceSettings, GeneralSettings generalSettings, IBmsClient bmsClient, ILoggerFactory loggerFactory)
     {
         DeviceIP = deviceSettings.IP;
@@ -45,6 +47,9 @@ public class BmsHandler : IBmsHandler
                 ? BmsHandlerStatus.Polling
                 : BmsHandlerStatus.Idle;
         }
+
+        this.OnStatusChanged?.Invoke();
+        _logger.LogCritical("Event fired!");
     }
 
     public async Task StartAsync(CancellationToken ct = default)

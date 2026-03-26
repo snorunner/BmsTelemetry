@@ -9,6 +9,8 @@ public interface IBmsHandler
     DateTime LastSuccess { get; }
     DateTime LastFailure { get; }
 
+    event Action? OnStatusChanged;
+
     Task StartAsync(CancellationToken ct);
 
     Task StopAsync();

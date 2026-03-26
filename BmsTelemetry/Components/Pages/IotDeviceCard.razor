@@ -1,0 +1,10 @@
+<div class="card">
+    <div>
+        <ConnectionStatusLight Status="@IotDevice.Connected" /> Connection: @IotDevice.Connected
+    </div>
+    <p>Type: IoT edge device</p>
+</div>
+
+@code {
+    [Parameter] public IIotDevice IotDevice { get; set; } = default!;
+}

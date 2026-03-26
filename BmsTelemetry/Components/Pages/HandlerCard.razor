@@ -1,11 +1,30 @@
+@implements IDisposable
+
 <div class="card">
-    <div><ConnectionStatusLight Status="@BmsHandler.Connection" /> Connection: @BmsHandler.Connection</div>
+    <div>
+        <ConnectionStatusLight Status="@BmsHandler.Connection" />
+        Connection: @BmsHandler.Connection
+    </div>
     <p>IP: @BmsHandler.DeviceIP</p>
     <p>Type: @BmsHandler.DeviceType</p>
     <p>Status: @BmsHandler.Status</p>
-
 </div>
 
 @code {
     [Parameter] public IBmsHandler BmsHandler { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        BmsHandler.OnStatusChanged += HandleStatusChanged;
+    }
+
+    private void HandleStatusChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        BmsHandler.OnStatusChanged -= HandleStatusChanged;
+    }
 }
