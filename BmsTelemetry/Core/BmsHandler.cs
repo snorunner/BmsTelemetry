@@ -58,6 +58,7 @@ public class BmsHandler : IBmsHandler
         lock (_stateLock)
         {
             Status = BmsHandlerStatus.Polling;
+            ConsecutiveFailures = 0;
         }
     }
 
@@ -79,7 +80,7 @@ public class BmsHandler : IBmsHandler
             if (ConsecutiveFailures >= 5 && Status != BmsHandlerStatus.Stopped)
             {
                 _logger.LogWarning($"Stopping {this.DeviceIP} due to excessive failures.");
-                _ = StopAsync(); // fire-and-forget safe here
+                _ = StopAsync();
                 return;
             }
 
