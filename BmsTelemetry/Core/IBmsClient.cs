@@ -1,5 +1,6 @@
 public interface IBmsClient
 {
-    Task StartAsync(CancellationToken ct);
-    Task StopAsync();
+    IAsyncEnumerable<ClientCommand> GetPollingSequenceAsync(CancellationToken ct);
+
+    // Task ExecuteUserCommandAsync(UserCommand cmd, CancellationToken ct);
 }

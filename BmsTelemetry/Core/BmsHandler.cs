@@ -1,74 +1,112 @@
+using System.Threading.Channels;
+using System.Text.Json.Nodes;
+
 public class BmsHandler : IBmsHandler
 {
+    // Internals
+    private readonly IBmsClient _bmsClient;
+    private readonly GeneralSettings _generalSettings;
+    private readonly CancellationTokenSource _cts = new();
     private readonly object _stateLock = new();
+    private readonly Channel<HandlerCommand> _queue = Channel.CreateUnbounded<HandlerCommand>();
     private readonly ILogger<BmsHandler> _logger;
+    private readonly IServiceScopeFactory _scopeFactory;
 
+    public Task LoopTask { get; }
+
+    // Identification info
     public string DeviceIP { get; init; }
     public BmsType DeviceType { get; init; }
 
+    // State info
     public ConnectionStatus Connection { get; private set; } = ConnectionStatus.Unknown;
     public BmsHandlerStatus Status { get; private set; } = BmsHandlerStatus.Idle;
-
     public int ConsecutiveFailures { get; private set; }
     public DateTime LastSuccess { get; private set; } = DateTime.MinValue;
     public DateTime LastFailure { get; private set; } = DateTime.MinValue;
 
-    private readonly IBmsClient _bmsClient;
-    private readonly GeneralSettings _generalSettings;
-
-    public BmsHandler(DeviceSettings deviceSettings, GeneralSettings generalSettings, IBmsClient bmsClient, ILoggerFactory loggerFactory)
+    public BmsHandler(
+        DeviceSettings deviceSettings,
+        GeneralSettings generalSettings,
+        IBmsClient bmsClient,
+        ILoggerFactory loggerFactory,
+        IServiceScopeFactory scopeFactory)
     {
         DeviceIP = deviceSettings.IP;
         DeviceType = deviceSettings.device_type;
         _bmsClient = bmsClient;
         _generalSettings = generalSettings;
         _logger = loggerFactory.CreateLogger<BmsHandler>();
+        _scopeFactory = scopeFactory;
 
-        // Subscribe to client status updates
-        if (_bmsClient is BaseDeviceClient client)
+        LoopTask = Task.Run(() => RunAsync(_cts.Token));
+    }
+
+    public ValueTask EnqueueStart() =>
+        _queue.Writer.WriteAsync(HandlerCommand.Start());
+
+    public ValueTask EnqueueStop() =>
+        _queue.Writer.WriteAsync(HandlerCommand.Stop());
+
+    private async Task RunAsync(CancellationToken ct)
+    {
+        await foreach (var cmd in _queue.Reader.ReadAllAsync(ct))
         {
-            client.OnStatusChanged += UpdateStatus;
+            switch (cmd.Type)
+            {
+                case HandlerCommandType.Start:
+                    await ProcessStartAsync(ct);
+                    break;
+
+                case HandlerCommandType.Stop:
+                    _cts.Cancel();
+                    break;
+
+                case HandlerCommandType.PollStep:
+                    await ExecutePollStepAsync(cmd.ClientCmd!, ct);
+                    break;
+            }
         }
     }
 
-    private void UpdateStatus(ClientStatusUpdate update)
+    private async Task ProcessStartAsync(CancellationToken ct)
     {
-        lock (_stateLock)
+        await foreach (var step in _bmsClient.GetPollingSequenceAsync(ct))
         {
-            Connection = update.Connection;
-            LastSuccess = update.LastSuccess;
-            LastFailure = update.LastFailure;
-            ConsecutiveFailures = update.ConsecutiveFailures;
-
-            // Map client state to simplified handler state
-            Status = update.Connection == ConnectionStatus.Connected
-                ? BmsHandlerStatus.Polling
-                : BmsHandlerStatus.Idle;
+            await _queue.Writer.WriteAsync(HandlerCommand.Poll(step), ct);
         }
     }
 
-    public async Task StartAsync(CancellationToken ct = default)
+    private async Task ExecutePollStepAsync(ClientCommand cmd, CancellationToken ct)
     {
-        lock (_stateLock)
-        {
-            if (Status == BmsHandlerStatus.Polling)
-                return; // already running
-        }
-        await _bmsClient.StartAsync(ct);
-        lock (_stateLock)
-        {
-            Status = BmsHandlerStatus.Polling;
-            ConsecutiveFailures = 0;
-        }
-    }
+        _logger.LogInformation("Executing poll step {Step}", cmd.Name);
 
-    public async Task StopAsync()
-    {
-        await _bmsClient.StopAsync();
-        lock (_stateLock)
+        var json = await cmd.Action(ct);
+
+        if (json is null)
         {
-            Status = BmsHandlerStatus.Stopped;
+            _logger.LogWarning("Poll step {Step} returned null", cmd.Name);
+            return;
         }
+
+        var flattened = new JsonObject();
+
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        foreach (var (key, val) in flattened)
+        {
+            db.Telemetry.Add(new TelemetryRecord
+            {
+                Ip = DeviceIP,
+                DeviceKey = DeviceType.ToString(),
+                DataKey = key,
+                DataValue = val,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     // Called by supervisor/background service to apply smart conditions
@@ -80,7 +118,7 @@ public class BmsHandler : IBmsHandler
             if (ConsecutiveFailures >= 5 && Status != BmsHandlerStatus.Stopped)
             {
                 _logger.LogWarning($"Stopping {this.DeviceIP} due to excessive failures.");
-                _ = StopAsync();
+                EnqueueStop();
                 return;
             }
 
@@ -89,7 +127,7 @@ public class BmsHandler : IBmsHandler
                 (DateTime.UtcNow - LastFailure) > TimeSpan.FromMinutes(30))
             {
                 _logger.LogInformation($"Starting {this.DeviceIP} after a cooldown period.");
-                _ = StartAsync(ct);
+                EnqueueStart();
             }
         }
     }
