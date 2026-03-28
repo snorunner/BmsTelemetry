@@ -4,10 +4,6 @@ public record GeneralSettings
     public int http_timeout_delay_seconds { get; init; } = 15;
     public int http_retry_count { get; init; } = 3;
     public int soft_reset_interval_hours { get; init; } = 12;
-    public int health_telemetry_max_interval_seconds { get; init; } = 900;
     public bool keep_alive { get; init; }
     public bool use_cloud { get; init; } = true;
-    public int lock_file_minutes { get; init; } = 720;
-    public int default_sleep_time_minutes { get; init; } = 240;
-    public int loop_delay_seconds { get; init; } = 60;
 }

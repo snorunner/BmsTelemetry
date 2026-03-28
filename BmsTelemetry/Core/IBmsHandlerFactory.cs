@@ -28,14 +28,16 @@ public class IBmsHandlerFactory
                 return new E2DeviceClient(
                     new BmsHttpTransport(
                         new Uri($"http://{deviceSettings.IP}:14106/JSON-RPC"),
-                        generalSettings
+                        generalSettings,
+                        _loggerFactory
                     )
                 );
             case BmsType.Danfoss:
                 return new DanfossDeviceClient(
                     new BmsHttpTransport(
                         new Uri($"http://{deviceSettings.IP}/http/xml.cgi"),
-                        generalSettings
+                        generalSettings,
+                        _loggerFactory
                     ),
                     _loggerFactory,
                     _iotDevice
@@ -44,7 +46,8 @@ public class IBmsHandlerFactory
                 return new E3DeviceClient(
                     new BmsHttpTransport(
                         new Uri($"http://{deviceSettings.IP}/cgi-bin/mgw.cgi"),
-                        generalSettings
+                        generalSettings,
+                        _loggerFactory
                     )
                 );
             default:
