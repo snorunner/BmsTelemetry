@@ -39,6 +39,8 @@ public class BmsHttpTransport : IBmsTransport
             int maxRetries = _generalSettings.http_retry_count;
             int attempt = 0;
 
+            var baseDelaySeconds = _generalSettings.http_request_delay_seconds;
+
             while (true)
             {
                 HttpRequestMessage clonedRequest = await CloneHttpRequestMessageAsync(request);
@@ -112,9 +114,14 @@ public class BmsHttpTransport : IBmsTransport
                 {
                     try
                     {
-                        await Task.Delay(
-                            TimeSpan.FromSeconds(_generalSettings.http_request_delay_seconds),
-                            ct);
+                        var backoff = Math.Pow(2, attempt - 1);
+
+                        var jitterMs = Random.Shared.Next(0, 1000);
+
+                        var delay = TimeSpan.FromSeconds(baseDelaySeconds * backoff)
+                            + TimeSpan.FromMilliseconds(jitterMs);
+
+                        await Task.Delay(delay, ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
                     {
