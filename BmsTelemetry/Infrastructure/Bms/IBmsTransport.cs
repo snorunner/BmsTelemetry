@@ -1,4 +1,4 @@
 public interface IBmsTransport
 {
-    Task<HttpResponseMessage?> SendAsync(HttpRequestMessage request, CancellationToken ct);
+    Task<HttpResponseMessage?> SendAsync(HttpRequestMessage request, CancellationToken ct = default, string? context = null);
 }

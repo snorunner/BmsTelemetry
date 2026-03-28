@@ -21,21 +21,33 @@ public class BmsHttpTransport : IBmsTransport
 
     public async Task<HttpResponseMessage?> SendAsync(
         HttpRequestMessage request,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? context = null)
     {
         await _lock.WaitAsync(ct);
-        request.RequestUri = _endpoint;
-        _logger.LogDebug($"Sending request to {request.RequestUri}");
 
         try
         {
             BuildClientIfNeeded();
 
+            request.RequestUri = _endpoint;
+
+            var requestName = context is not null
+                ? $"request `{context}`"
+                : "request";
+
+            int maxRetries = _generalSettings.http_retry_count;
             int attempt = 0;
 
             while (true)
             {
                 HttpRequestMessage clonedRequest = await CloneHttpRequestMessageAsync(request);
+
+                _logger.LogDebug(
+                    "Sending {Request} to {Uri} (attempt {Attempt})",
+                    requestName,
+                    clonedRequest.RequestUri,
+                    attempt + 1);
 
                 try
                 {
@@ -43,15 +55,58 @@ public class BmsHttpTransport : IBmsTransport
 
                     var response = await _httpClient!.SendAsync(clonedRequest, ct);
 
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new HttpRequestException(
+                            $"Request failed with status code {(int)response.StatusCode}",
+                            null,
+                            response.StatusCode);
+                    }
+
                     return response;
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
+                    // graceful shutdown (Ctrl+C etc.)
                     throw;
                 }
-                catch (Exception) when (attempt < _generalSettings.http_retry_count)
+                catch (HttpRequestException ex) when (attempt < maxRetries)
                 {
-                    // retry
+                    var statusCode = ex.StatusCode?.ToString() ?? "no-status";
+
+                    _logger.LogWarning(ex,
+                        "{Request} failed with status {StatusCode}. Retrying ({Attempt}/{MaxRetries})",
+                        requestName,
+                        statusCode,
+                        attempt,
+                        maxRetries);
+                }
+                catch (Exception ex) when (attempt < maxRetries)
+                {
+                    _logger.LogWarning(ex,
+                        "{Request} failed with unexpected error. Retrying ({Attempt}/{MaxRetries})",
+                        requestName,
+                        attempt,
+                        maxRetries);
+                }
+                catch (HttpRequestException ex)
+                {
+                    var statusCode = ex.StatusCode?.ToString() ?? "no-status";
+
+                    _logger.LogError(ex,
+                        "{Request} failed permanently with status {StatusCode}",
+                        requestName,
+                        statusCode);
+
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "{Request} failed permanently with unexpected error",
+                        requestName);
+
+                    return null;
                 }
                 finally
                 {
@@ -63,7 +118,7 @@ public class BmsHttpTransport : IBmsTransport
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
                     {
-                        // swallow delay cancellation so Ctrl+C is clean
+                        // swallow cancellation during delay for clean shutdown
                     }
                 }
             }

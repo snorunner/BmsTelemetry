@@ -23,13 +23,10 @@ public class DanfossProtocol
     {
         var request = BuildRequest(action, extraParams);
 
-        _logger.LogDebug($"Sending Danfoss command {action}");
-
-        var response = await _transport.SendAsync(request, ct);
+        var response = await _transport.SendAsync(request, ct, action);
 
         if (response is null || !response.IsSuccessStatusCode)
         {
-            _logger.LogWarning($"Danfoss command {action} failed. [{response?.StatusCode}]");
             return null;
         }
 
