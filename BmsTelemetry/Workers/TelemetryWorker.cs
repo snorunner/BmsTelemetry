@@ -1,14 +1,15 @@
-// using System.Text.Json.Nodes;
-
 public sealed class TelemetryWorker : BackgroundService
 {
     private readonly IIotDevice _iotDevice;
+    private readonly DbReader _dbReader;
     private readonly ILogger<TelemetryWorker> _logger;
+
     private DateTime _lastFullFrameTime = DateTime.MinValue;
 
-    public TelemetryWorker(IIotDevice iotDevice, ILogger<TelemetryWorker> logger)
+    public TelemetryWorker(IIotDevice iotDevice, DbReader dbReader, ILogger<TelemetryWorker> logger)
     {
         _iotDevice = iotDevice;
+        _dbReader = dbReader;
         _logger = logger;
     }
 
@@ -16,22 +17,26 @@ public sealed class TelemetryWorker : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(8), stoppingToken);
             _logger.LogInformation("Simulating sending telemetry...");
+            var x = await _dbReader.GetHotRowsAsJson("10.158.71.180");
+
+            Console.WriteLine(x);
+
 
             // declare data;
 
-            if (DateTime.UtcNow - _lastFullFrameTime >= TimeSpan.FromMinutes(60))
-            {
-                _logger.LogInformation("Sending full frame of data");
-                // data = get full data;
-                _lastFullFrameTime = DateTime.UtcNow;
-            }
-            else
-            {
-                _logger.LogInformation("Sending CoV frame of data");
-                // data = get CoV data;
-            }
+            // if (DateTime.UtcNow - _lastFullFrameTime >= TimeSpan.FromMinutes(60))
+            // {
+            //     _logger.LogInformation("Sending full frame of data");
+            //     // data = get full data;
+            //     _lastFullFrameTime = DateTime.UtcNow;
+            // }
+            // else
+            // {
+            //     _logger.LogInformation("Sending CoV frame of data");
+            //     // data = get CoV data;
+            // }
 
             // var dataToSend = JsonArrayConvert(data); <- Do NOT implement this, just a placeholder assume defined elsewhere.
 

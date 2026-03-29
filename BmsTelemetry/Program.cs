@@ -20,6 +20,7 @@ builder.Services.AddSingleton<CertificateProvider>();
 builder.Services.AddSingleton<KeyvaultService>();
 builder.Services.AddSingleton<DpsService>();
 builder.Services.AddSingleton<UptimeService>();
+builder.Services.AddSingleton<DbReader>();
 
 builder.Services.AddAppDatabase("Data/database.db");
 
