@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using System.Text.Json.Nodes;
+using EFCore.BulkExtensions;
 
 public class BmsHandler : IBmsHandler
 {
@@ -110,7 +111,6 @@ public class BmsHandler : IBmsHandler
         _logger.LogInformation("Executing poll step {Step}", cmd.Name);
 
         var json = await cmd.Action(ct);
-
         if (json is null)
         {
             _logger.LogWarning("Poll step {Step} returned null", cmd.Name);
@@ -131,16 +131,16 @@ public class BmsHandler : IBmsHandler
         if (dataArray is null)
             return;
 
+        var incomingItems = new List<TelemetryRecord>();
         foreach (var item in dataArray)
         {
             var obj = item!.AsObject();
-
             var deviceKey = obj["device_key"]?.ToString() ?? "?";
             var dataObj = obj["data"]!.AsObject();
 
             foreach (var kvp in dataObj)
             {
-                db.Telemetry.Add(new TelemetryRecord
+                incomingItems.Add(new TelemetryRecord
                 {
                     Ip = DeviceIP,
                     DeviceKey = $"{DeviceType}:{deviceKey}",
@@ -152,9 +152,65 @@ public class BmsHandler : IBmsHandler
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        if (!incomingItems.Any())
+            return;
+
+        // BULK UPSERT
+        await db.BulkInsertOrUpdateAsync(incomingItems, cancellationToken: ct);
+
         await TryScheduleNextPollStep(ct);
     }
+
+    // private async Task ExecutePollStepAsync(ClientCommand cmd, CancellationToken ct)
+    // {
+    //     _logger.LogInformation("Executing poll step {Step}", cmd.Name);
+    //
+    //     var json = await cmd.Action(ct);
+    //
+    //     if (json is null)
+    //     {
+    //         _logger.LogWarning("Poll step {Step} returned null", cmd.Name);
+    //         ConsecutiveFailures++;
+    //         LastFailure = DateTime.UtcNow;
+    //         Connection = ConnectionStatus.Disconnected;
+    //         return;
+    //     }
+    //
+    //     ConsecutiveFailures = 0;
+    //     Connection = ConnectionStatus.Connected;
+    //     LastSuccess = DateTime.UtcNow;
+    //
+    //     using var scope = _scopeFactory.CreateScope();
+    //     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    //
+    //     var dataArray = json["data"] as JsonArray;
+    //     if (dataArray is null)
+    //         return;
+    //
+    //     foreach (var item in dataArray)
+    //     {
+    //         var obj = item!.AsObject();
+    //
+    //         var deviceKey = obj["device_key"]?.ToString() ?? "?";
+    //         var dataObj = obj["data"]!.AsObject();
+    //
+    //         foreach (var kvp in dataObj)
+    //         {
+    //             db.Telemetry.Add(new TelemetryRecord
+    //             {
+    //                 Ip = DeviceIP,
+    //                 DeviceKey = $"{DeviceType}:{deviceKey}",
+    //                 DataKey = kvp.Key,
+    //                 DataValue = kvp.Value?.ToString() ?? "?",
+    //                 Timestamp = DateTime.UtcNow,
+    //                 Source = cmd.Name
+    //             });
+    //         }
+    //     }
+    //
+    //     await db.SaveChangesAsync(ct);
+    //     await TryScheduleNextPollStep(ct);
+    // }
 
     // Called by supervisor/background service to apply smart conditions
     public async Task EvaluateAsync(CancellationToken ct)

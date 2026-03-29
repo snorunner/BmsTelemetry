@@ -15,7 +15,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<TelemetryRecord>(entity =>
         {
-            entity.HasKey(e => new { e.Id, e.DeviceKey, e.DataKey });
+            entity.HasKey(e => new { e.Ip, e.DeviceKey, e.DataKey });
 
             entity.Property(e => e.Ip)
                   .IsRequired();
