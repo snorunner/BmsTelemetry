@@ -13,6 +13,7 @@ public class BmsHandler : IBmsHandler
     private readonly IServiceScopeFactory _scopeFactory;
 
     public Task LoopTask { get; }
+    private IAsyncEnumerator<ClientCommand>? _pollEnumerator;
 
     // Identification info
     public string DeviceIP { get; init; }
@@ -20,7 +21,7 @@ public class BmsHandler : IBmsHandler
 
     // State info
     public ConnectionStatus Connection { get; private set; } = ConnectionStatus.Disconnected;
-    public BmsHandlerStatus Status { get; private set; } = BmsHandlerStatus.Idle;
+    public BmsHandlerStatus Status { get; private set; } = BmsHandlerStatus.Stopped;
     public int ConsecutiveFailures { get; private set; } = 0;
     public DateTime LastSuccess { get; private set; } = DateTime.MinValue;
     public DateTime LastFailure { get; private set; } = DateTime.MinValue;
@@ -77,12 +78,31 @@ public class BmsHandler : IBmsHandler
 
     private async Task ProcessStartAsync(CancellationToken ct)
     {
-        await foreach (var step in _bmsClient.GetPollingSequenceAsync(ct))
-        {
-            await _queue.Writer.WriteAsync(HandlerCommand.Poll(step), ct);
-        }
+        _pollEnumerator = _bmsClient.GetPollingSequenceAsync(ct).GetAsyncEnumerator(ct);
 
-        await _queue.Writer.WriteAsync(HandlerCommand.Start(), ct);
+        await TryScheduleNextPollStep(ct);
+    }
+
+    private async Task TryScheduleNextPollStep(CancellationToken ct)
+    {
+        if (_queue.Reader.Count > 0)
+            return;
+
+        if (_pollEnumerator == null)
+            return;
+
+        if (await _pollEnumerator.MoveNextAsync())
+        {
+            await _queue.Writer.WriteAsync(HandlerCommand.Poll(_pollEnumerator.Current), ct);
+        }
+        else
+        {
+            await _pollEnumerator.DisposeAsync();
+
+            _pollEnumerator = _bmsClient.GetPollingSequenceAsync(ct).GetAsyncEnumerator(ct);
+
+            await TryScheduleNextPollStep(ct);
+        }
     }
 
     private async Task ExecutePollStepAsync(ClientCommand cmd, CancellationToken ct)
@@ -133,6 +153,7 @@ public class BmsHandler : IBmsHandler
         }
 
         await db.SaveChangesAsync(ct);
+        await TryScheduleNextPollStep(ct);
     }
 
     // Called by supervisor/background service to apply smart conditions
@@ -149,7 +170,7 @@ public class BmsHandler : IBmsHandler
             }
 
             // Restart if stopped/idle and last failure was > 30 min ago
-            if ((Status == BmsHandlerStatus.Stopped || Status == BmsHandlerStatus.Idle) &&
+            if ((Status == BmsHandlerStatus.Stopped) &&
                 (DateTime.UtcNow - LastFailure) > TimeSpan.FromMinutes(30))
             {
                 _logger.LogInformation($"Starting {this.DeviceIP} after a cooldown period.");
