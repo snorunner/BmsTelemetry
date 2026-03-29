@@ -6,17 +6,20 @@ public class IBmsHandlerFactory
     private readonly GeneralSettings _generalSettings;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IIotDevice _iotDevice;
+    private readonly DbReader _dbReader;
 
     public IBmsHandlerFactory(
         ILoggerFactory loggerFactory,
         IOptions<GeneralSettings> generalSettings,
         IIotDevice iotDevice,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        DbReader dbReader)
     {
         _loggerFactory = loggerFactory;
         _generalSettings = generalSettings.Value;
         _iotDevice = iotDevice;
         _scopeFactory = scopeFactory;
+        _dbReader = dbReader;
     }
 
     public IBmsHandler Create(DeviceSettings deviceSettings)
@@ -45,8 +48,9 @@ public class IBmsHandlerFactory
                         generalSettings,
                         _loggerFactory
                     ),
-                    _loggerFactory,
-                    _iotDevice
+                    deviceSettings.IP,
+                    _dbReader,
+                    _loggerFactory
                 );
             // case BmsType.EmersonE3:
             //     return new E3DeviceClient(

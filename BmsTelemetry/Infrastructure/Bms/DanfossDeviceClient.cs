@@ -7,51 +7,100 @@ public sealed class DanfossDeviceClient : IBmsClient
     private readonly DanfossProtocol _protocol;
     private readonly ILogger<DanfossDeviceClient> _logger;
     private readonly IBmsTransport _transport;
-    private readonly IIotDevice _iotDevice;
+    private readonly DbReader _dbReader;
+    private readonly string _ip;
+    private DateTime _lastInitTime = DateTime.MinValue;
 
-    public DanfossDeviceClient(IBmsTransport transport, ILoggerFactory loggerFactory, IIotDevice iotDevice)
+    public DanfossDeviceClient(IBmsTransport transport, string deviceIP, DbReader dbReader, ILoggerFactory loggerFactory)
     {
         _logger = loggerFactory.CreateLogger<DanfossDeviceClient>();
         _protocol = new DanfossProtocol(transport, loggerFactory);
-        _iotDevice = iotDevice;
         _transport = transport;
+        _dbReader = dbReader;
+        _ip = deviceIP;
     }
 
-    public async IAsyncEnumerable<ClientCommand> GetPollingSequenceAsync([EnumeratorCancellation] CancellationToken ct)
+    public async IAsyncEnumerable<ClientCommand> GetPollingSequenceAsync(
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        // if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
+        // {
+        //     foreach (var cmd in GetInitCommands())
+        //     {
+        //         yield return cmd;
+        //     }
+        //
+        //     _lastInitTime = DateTime.UtcNow;
+        // }
+        //
+        // foreach (var cmd in GetContinuousCommands())
+        // {
+        //     yield return cmd;
+        // }
+
+        yield return new ClientCommand(
+            "ReadHvacUnitAsync",
+            ct => ReadHvacUnitAsync(ct)
+        );
+    }
+
+    private IEnumerable<ClientCommand> GetInitCommands()
     {
         yield return new ClientCommand(
             "ReadInputsAsync",
-            async ct2 => await ReadInputsAsync(ct2)
+            ct => ReadInputsAsync(ct)
         );
 
         yield return new ClientCommand(
             "ReadRelaysAsync",
-            async ct2 => await ReadRelaysAsync(ct2)
+            ct => ReadRelaysAsync(ct)
         );
 
         yield return new ClientCommand(
             "ReadSensorsAsync",
-            async ct2 => await ReadSensorsAsync(ct2)
+            ct => ReadSensorsAsync(ct)
         );
 
         yield return new ClientCommand(
             "ReadVarOutsAsync",
-            async ct2 => await ReadVarOutsAsync(ct2)
+            ct => ReadVarOutsAsync(ct)
         );
 
         yield return new ClientCommand(
+            "ReadUnitsAsync",
+            ct => ReadUnitsAsync(ct)
+        );
+    }
+
+    private IEnumerable<ClientCommand> GetContinuousCommands()
+    {
+        yield return new ClientCommand(
             "AlarmSummaryAsync",
-            async ct2 => await AlarmSummaryAsync(ct2)
+            ct => AlarmSummaryAsync(ct)
         );
 
         yield return new ClientCommand(
             "ReadDevicesAsync",
-            async ct2 => await ReadDevicesAsync(ct2)
+            ct => ReadDevicesAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadLightingAsync",
+            ct => ReadLightingAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadHvacAsync",
+            ct => ReadHvacAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadHvacUnitAsync",
+            ct => ReadHvacUnitAsync(ct)
         );
     }
 
     // Interaction methods
-
     private async Task<JsonNode?> ReadSensorsAsync(CancellationToken ct)
     {
         var response = await _protocol.SendCommandAsync("read_sensors", null, ct);
@@ -106,13 +155,74 @@ public sealed class DanfossDeviceClient : IBmsClient
         return AtParse("device", response);
     }
 
+    private async Task<JsonNode?> ReadLightingAsync(CancellationToken ct)
+    {
+        var response = await _protocol.SendCommandAsync("read_lighting", null, ct);
+        if (response is null)
+            return null;
+
+        return AtParse("device", response);
+    }
+
+    private async Task<JsonNode?> ReadUnitsAsync(CancellationToken ct)
+    {
+        var response = await _protocol.SendCommandAsync("read_units", null, ct);
+        if (response is null)
+            return null;
+
+        return BareParse("controller", response);
+    }
+
+    private async Task<JsonNode?> ReadHvacAsync(CancellationToken ct)
+    {
+        var response = await _protocol.SendCommandAsync("read_hvac", null, ct);
+        if (response is null)
+            return null;
+
+        return AtParse("device", response);
+    }
+
+    private async Task<JsonNode?> ReadHvacUnitAsync(CancellationToken ct)
+    {
+        var atContainer = new JsonObject();
+        var arrContainer = new JsonObject();
+        var jsonArr = new JsonArray();
+
+        string methodName = "ReadHvacUnitAsync";
+
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadHvacAsync", ct);
+
+        for (var i = 1; i < jsonRows.Count + 1; i++)
+        {
+            _logger.LogInformation("Executing {methodName} step {i} of {jsonRows.Count}", methodName, i, jsonRows.Count);
+
+            var response = await _protocol.SendCommandAsync(
+                "read_hvac_unit",
+                new Dictionary<string, string>() { ["ahindex"] = i.ToString() },
+                ct
+            );
+
+            if (response is null)
+                continue;
+
+            var jsonData = response["resp"]?.AsObject() ?? new JsonObject();
+            jsonArr.Add(jsonData.DeepClone());
+        }
+
+        arrContainer["arrkey"] = jsonArr;
+        atContainer["resp"] = arrContainer;
+
+        var final = AtParse("arrkey", atContainer);
+
+        return final;
+    }
+
     // private Task<JsonNode?> ReadHvacUnitAsync(string ahindex, CancellationToken ct)
     // {
     //     return _protocol.SendCommandAsync("read_hvac_unit", new Dictionary<string, string>() { ["ahindex"] = ahindex }, ct);
     // }
 
     // Helper methods
-
     private JsonObject BareParse(string deviceKey, JsonNode data)
     {
         var jsonResponse = data["resp"]?.AsObject() ?? new JsonObject();
@@ -120,7 +230,7 @@ public sealed class DanfossDeviceClient : IBmsClient
 
         var obj = new JsonObject
         {
-            ["device_key"] = "alarm_summary",
+            ["device_key"] = deviceKey,
             ["data"] = normalized.DeepClone()
         };
 

@@ -19,7 +19,7 @@ public sealed class TelemetryWorker : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
             _logger.LogInformation("Simulating sending telemetry...");
 
             JsonArray dataToSend;
