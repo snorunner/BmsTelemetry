@@ -1,0 +1,73 @@
+@page "/logs"
+
+<h1>Logs</h1>
+
+<div class="logs-container">
+    <!-- LEFT: file list -->
+    <div class="log-files">
+        <h3>Files</h3>
+
+        @foreach (var file in logFiles)
+        {
+            <div class="log-file @(file == selectedFile ? "active" : "")"
+                 @onclick="() => SelectFile(file)">
+                @Path.GetFileName(file)
+            </div>
+        }
+    </div>
+
+    <!-- RIGHT: log viewer -->
+    <div class="log-view">
+        <h3>@(selectedFile ?? "Select a log file")</h3>
+
+        <button @onclick="LoadLogs">Refresh</button>
+
+        <pre class="log-viewer">@logContent</pre>
+    </div>
+</div>
+
+@code {
+    string logsPath = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+
+    List<string> logFiles = new();
+    string? selectedFile;
+    string logContent = "Select a log file...";
+
+    protected override void OnInitialized()
+    {
+        LoadFileList();
+    }
+
+    void LoadFileList()
+    {
+        if (Directory.Exists(logsPath))
+        {
+            logFiles = Directory.GetFiles(logsPath, "*.log")
+                                .OrderByDescending(f => f)
+                                .ToList();
+        }
+    }
+
+    async Task SelectFile(string file)
+    {
+        selectedFile = file;
+        await LoadLogs();
+    }
+
+    async Task LoadLogs()
+    {
+        if (selectedFile == null)
+            return;
+
+        try
+        {
+            // ✅ Only load last 200 lines (important for large logs)
+            var lines = File.ReadLines(selectedFile).TakeLast(200);
+            logContent = string.Join("\n", lines);
+        }
+        catch (Exception ex)
+        {
+            logContent = $"Error: {ex.Message}";
+        }
+    }
+}

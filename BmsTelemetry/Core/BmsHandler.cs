@@ -19,9 +19,9 @@ public class BmsHandler : IBmsHandler
     public BmsType DeviceType { get; init; }
 
     // State info
-    public ConnectionStatus Connection { get; private set; } = ConnectionStatus.Unknown;
+    public ConnectionStatus Connection { get; private set; } = ConnectionStatus.Disconnected;
     public BmsHandlerStatus Status { get; private set; } = BmsHandlerStatus.Idle;
-    public int ConsecutiveFailures { get; private set; }
+    public int ConsecutiveFailures { get; private set; } = 0;
     public DateTime LastSuccess { get; private set; } = DateTime.MinValue;
     public DateTime LastFailure { get; private set; } = DateTime.MinValue;
 
@@ -42,11 +42,17 @@ public class BmsHandler : IBmsHandler
         LoopTask = Task.Run(() => RunAsync(_cts.Token));
     }
 
-    public ValueTask EnqueueStart() =>
-        _queue.Writer.WriteAsync(HandlerCommand.Start());
+    public ValueTask EnqueueStart()
+    {
+        Status = BmsHandlerStatus.Polling;
+        return _queue.Writer.WriteAsync(HandlerCommand.Start());
+    }
 
-    public ValueTask EnqueueStop() =>
-        _queue.Writer.WriteAsync(HandlerCommand.Stop());
+    public ValueTask EnqueueStop()
+    {
+        Status = BmsHandlerStatus.Stopped;
+        return _queue.Writer.WriteAsync(HandlerCommand.Stop());
+    }
 
     private async Task RunAsync(CancellationToken ct)
     {
@@ -75,6 +81,8 @@ public class BmsHandler : IBmsHandler
         {
             await _queue.Writer.WriteAsync(HandlerCommand.Poll(step), ct);
         }
+
+        await _queue.Writer.WriteAsync(HandlerCommand.Start(), ct);
     }
 
     private async Task ExecutePollStepAsync(ClientCommand cmd, CancellationToken ct)
@@ -86,26 +94,42 @@ public class BmsHandler : IBmsHandler
         if (json is null)
         {
             _logger.LogWarning("Poll step {Step} returned null", cmd.Name);
+            ConsecutiveFailures++;
+            LastFailure = DateTime.UtcNow;
+            Connection = ConnectionStatus.Disconnected;
             return;
         }
 
-        var flattened = NormalizerService.Normalize(DeviceType.ToString(), "testing", json.AsObject());
-        JsonObject test = flattened["data"]!.AsObject();
+        ConsecutiveFailures = 0;
+        Connection = ConnectionStatus.Connected;
+        LastSuccess = DateTime.UtcNow;
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        foreach (var (key, val) in test)
+        var dataArray = json["data"] as JsonArray;
+        if (dataArray is null)
+            return;
+
+        foreach (var item in dataArray)
         {
-            db.Telemetry.Add(new TelemetryRecord
+            var obj = item!.AsObject();
+
+            var deviceKey = obj["device_key"]?.ToString() ?? "?";
+            var dataObj = obj["data"]!.AsObject();
+
+            foreach (var kvp in dataObj)
             {
-                Ip = DeviceIP,
-                DeviceKey = DeviceType.ToString(),
-                DataKey = key,
-                DataValue = (string?)val ?? "?",
-                Timestamp = DateTime.UtcNow,
-                Source = cmd.Name
-            });
+                db.Telemetry.Add(new TelemetryRecord
+                {
+                    Ip = DeviceIP,
+                    DeviceKey = $"{DeviceType}:{deviceKey}",
+                    DataKey = kvp.Key,
+                    DataValue = kvp.Value?.ToString() ?? "?",
+                    Timestamp = DateTime.UtcNow,
+                    Source = cmd.Name
+                });
+            }
         }
 
         await db.SaveChangesAsync(ct);

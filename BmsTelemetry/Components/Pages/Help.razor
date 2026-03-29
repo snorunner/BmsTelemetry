@@ -1,0 +1,44 @@
+@page "/help"
+
+<h1>Help & Documentation</h1>
+<h1>THIS PAGE IS SAMPLE TEXT AND NOT ACCURATE</h1>
+
+<h2>Overview</h2>
+<p>
+This application runs as a background service that connects to IoT devices over HTTP/IP,
+collects telemetry data, and uploads it securely to the cloud via IoT Hub.
+</p>
+
+<h2>How It Works</h2>
+<ol>
+    <li>Discovers or connects to configured IoT devices</li>
+    <li>Polls devices at a configured interval</li>
+    <li>Processes and formats the data</li>
+    <li>Uploads data to the cloud via IoT Hub</li>
+</ol>
+
+<h2>Getting Started</h2>
+
+<h3>1. Configure Devices</h3>
+<p>Add device IP addresses and endpoints in the configuration.</p>
+
+<h3>2. Set Polling Interval</h3>
+<p>Define how often the service should query devices.</p>
+
+<h3>3. Configure Cloud Connection</h3>
+<p>Provide your IoT Hub connection string and credentials.</p>
+
+<h3>4. Start the Service</h3>
+<p>Run the application and verify connection status.</p>
+
+<h2>Configuration Example</h2>
+
+<pre>
+{
+  "Devices": [
+    { "Ip": "192.168.1.10", "Endpoint": "/api/data" }
+  ],
+  "PollingIntervalSeconds": 30,
+  "IoTHubConnectionString": "..."
+}
+</pre>

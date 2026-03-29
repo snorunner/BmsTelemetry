@@ -2,10 +2,7 @@ using System.Text.Json.Nodes;
 
 public static class NormalizerService
 {
-    public static JsonObject Normalize(
-        string deviceType,
-        string dataAddress,
-        JsonObject? rawData)
+    public static JsonObject Normalize(JsonObject? rawData)
     {
         var flat = new Dictionary<string, object?>();
 
@@ -28,11 +25,7 @@ public static class NormalizerService
             };
         }
 
-        return new JsonObject
-        {
-            ["device_key"] = $"{deviceType}:{dataAddress}",
-            ["data"] = dataObject
-        };
+        return dataObject;
     }
 
     private static void FlattenJson(JsonNode node, Dictionary<string, object?> output, string prefix)
