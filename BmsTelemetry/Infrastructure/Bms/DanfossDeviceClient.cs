@@ -23,25 +23,26 @@ public sealed class DanfossDeviceClient : IBmsClient
     public async IAsyncEnumerable<ClientCommand> GetPollingSequenceAsync(
         [EnumeratorCancellation] CancellationToken ct)
     {
-        // if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
-        // {
-        //     foreach (var cmd in GetInitCommands())
-        //     {
-        //         yield return cmd;
-        //     }
-        //
-        //     _lastInitTime = DateTime.UtcNow;
-        // }
-        //
-        // foreach (var cmd in GetContinuousCommands())
-        // {
-        //     yield return cmd;
-        // }
+        if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
+        {
+            foreach (var cmd in GetInitCommands())
+            {
+                yield return cmd;
+            }
 
-        yield return new ClientCommand(
-            "ReadHvacUnitAsync",
-            ct => ReadHvacUnitAsync(ct)
-        );
+            _lastInitTime = DateTime.UtcNow;
+        }
+
+        foreach (var cmd in GetContinuousCommands())
+        {
+            yield return cmd;
+        }
+
+        // Test new commands
+        // yield return new ClientCommand(
+        //     "ReadHvacServiceAsync",
+        //     ct => ReadHvacServiceAsync(ct)
+        // );
     }
 
     private IEnumerable<ClientCommand> GetInitCommands()
@@ -97,6 +98,11 @@ public sealed class DanfossDeviceClient : IBmsClient
         yield return new ClientCommand(
             "ReadHvacUnitAsync",
             ct => ReadHvacUnitAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadHvacServiceAsync",
+            ct => ReadHvacServiceAsync(ct)
         );
     }
 
@@ -217,6 +223,41 @@ public sealed class DanfossDeviceClient : IBmsClient
         return final;
     }
 
+    private async Task<JsonNode?> ReadHvacServiceAsync(CancellationToken ct)
+    {
+        var atContainer = new JsonObject();
+        var arrContainer = new JsonObject();
+        var jsonArr = new JsonArray();
+
+        string methodName = "ReadHvacServiceAsync";
+
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadHvacAsync", ct);
+
+        for (var i = 1; i < jsonRows.Count + 1; i++)
+        {
+            _logger.LogInformation("Executing {methodName} step {i} of {jsonRows.Count}", methodName, i, jsonRows.Count);
+
+            var response = await _protocol.SendCommandAsync(
+                "read_hvac_service",
+                new Dictionary<string, string>() { ["ahindex"] = i.ToString() },
+                ct
+            );
+
+            if (response is null)
+                continue;
+
+            var jsonData = response["resp"]?.AsObject() ?? new JsonObject();
+            jsonArr.Add(jsonData.DeepClone());
+        }
+
+        arrContainer["arrkey"] = jsonArr;
+        atContainer["resp"] = arrContainer;
+
+        var final = SingleAtParse("arrkey", "@ahindex", atContainer);
+
+        return final;
+    }
+
     // private Task<JsonNode?> ReadHvacUnitAsync(string ahindex, CancellationToken ct)
     // {
     //     return _protocol.SendCommandAsync("read_hvac_unit", new Dictionary<string, string>() { ["ahindex"] = ahindex }, ct);
@@ -294,6 +335,36 @@ public sealed class DanfossDeviceClient : IBmsClient
             var obj = new JsonObject
             {
                 ["device_key"] = $"nt{nodeType}:n{node}:m{mod}:p{point}",
+                ["data"] = normalized.DeepClone()
+            };
+
+            dataArray.Add(obj);
+        }
+
+        root["data"] = dataArray;
+        return root;
+    }
+
+    private JsonObject SingleAtParse(string subKey, string atKey, JsonNode data)
+    {
+        var jsonResponse = data["resp"]?.AsObject() ?? new JsonObject();
+        var subarr = jsonResponse[subKey] as JsonArray ?? new JsonArray();
+
+        var root = new JsonObject();
+        var dataArray = new JsonArray();
+
+        foreach (var entryNode in subarr)
+        {
+            if (entryNode is not JsonObject entry)
+                continue;
+
+            var atVal = entry[atKey]?.GetValue<string>() ?? "?";
+
+            var normalized = NormalizerService.Normalize(entry);
+
+            var obj = new JsonObject
+            {
+                ["device_key"] = $"{atKey}{atVal}",
                 ["data"] = normalized.DeepClone()
             };
 
