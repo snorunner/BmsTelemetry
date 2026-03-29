@@ -9,3 +9,15 @@ public class TelemetryRecord
 
     public DateTime Timestamp { get; set; }
 }
+
+public class TelemetrySnapshotRecord
+{
+    public string Ip { get; set; } = string.Empty;
+    public string DeviceKey { get; set; } = string.Empty;
+    public string Source { get; set; } = string.Empty;
+
+    public string DataKey { get; set; } = string.Empty;
+    public string DataValue { get; set; } = string.Empty;
+
+    public DateTime Timestamp { get; set; }
+}

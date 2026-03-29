@@ -65,7 +65,7 @@ public sealed class AzureIotDevice : IIotDevice, IAsyncDisposable
                           ?? new JsonObject { ["value"] = item };
 
                 // FILTER HERE
-                if (!obj.ContainsKey("data"))
+                if (!obj.ContainsKey("Data"))
                     continue;
 
                 yield return obj;
@@ -73,12 +73,12 @@ public sealed class AzureIotDevice : IIotDevice, IAsyncDisposable
         }
         else if (diff is JsonObject obj)
         {
-            if (obj.ContainsKey("data"))
+            if (obj.ContainsKey("Data"))
                 yield return obj;
         }
         else
         {
-            // Non-object payloads cannot have "data", so skip them
+            // Non-object payloads cannot have "Data", so skip them
             yield break;
         }
     }
