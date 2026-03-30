@@ -40,8 +40,8 @@ public sealed class DanfossDeviceClient : IBmsClient
 
         // Test new commands
         yield return new ClientCommand(
-            "ReadSuctionGroupAsync",
-            ct => ReadSuctionGroupAsync(ct)
+            "ReadCircuitAsync",
+            ct => ReadCircuitAsync(ct)
         );
     }
 
@@ -71,6 +71,21 @@ public sealed class DanfossDeviceClient : IBmsClient
             "ReadUnitsAsync",
             ct => ReadUnitsAsync(ct)
         );
+
+        yield return new ClientCommand(
+            "ReadDevicesAsync",
+            ct => ReadDevicesAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadSuctionGroupAsync",
+            ct => ReadSuctionGroupAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadCondenserAsync",
+            ct => ReadCondenserAsync(ct)
+        );
     }
 
     private IEnumerable<ClientCommand> GetContinuousCommands()
@@ -78,11 +93,6 @@ public sealed class DanfossDeviceClient : IBmsClient
         yield return new ClientCommand(
             "AlarmSummaryAsync",
             ct => AlarmSummaryAsync(ct)
-        );
-
-        yield return new ClientCommand(
-            "ReadDevicesAsync",
-            ct => ReadDevicesAsync(ct)
         );
 
         yield return new ClientCommand(
@@ -347,6 +357,100 @@ public sealed class DanfossDeviceClient : IBmsClient
             outArr.Add(result["data"]![0]!.DeepClone());
         }
         //
+        var jsonWrap = new JsonObject();
+        jsonWrap["data"] = outArr.DeepClone();
+        return jsonWrap;
+    }
+
+    private async Task<JsonNode?> ReadCondenserAsync(CancellationToken ct)
+    {
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadDevicesAsync", ct);
+
+        var outArr = new JsonArray();
+
+        var seen = new HashSet<string>();
+        foreach (var entry in jsonRows)
+        {
+            var rId = entry?["Data"]?["@rack_id"]?.GetValue<string>() ?? null;
+
+            if (string.IsNullOrEmpty(rId))
+                continue;
+
+            if (seen.Contains(rId))
+                continue;
+
+            seen.Add(rId);
+        }
+
+        string methodName = "ReadCondenserAsync";
+        int i = 0;
+        foreach (var idAddr in seen)
+        {
+            i++;
+            _logger.LogInformation("Executing {methodName} step {i} of {seen.Count}", methodName, i, seen.Count);
+
+            var response = await _protocol.SendCommandAsync(
+                "read_condenser",
+                new Dictionary<string, string>() { ["rack_id"] = idAddr },
+                ct
+            );
+
+            if (response is null)
+                continue;
+
+            var result = BareParse($"condenser:rackId{idAddr}", response);
+            outArr.Add(result["data"]![0]!.DeepClone());
+        }
+        //
+        var jsonWrap = new JsonObject();
+        jsonWrap["data"] = outArr.DeepClone();
+        return jsonWrap;
+    }
+
+    private async Task<JsonNode?> ReadCircuitAsync(CancellationToken ct)
+    {
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadSuctionGroupAsync", ct);
+
+        var outArr = new JsonArray();
+
+        string methodName = "ReadCircuitAsync";
+        int i = 0;
+        foreach (var entry in jsonRows)
+        {
+            var sId = entry?["Data"]?["@suction_id"]?.GetValue<string>() ?? null;
+            var rId = entry?["Data"]?["@rack_id"]?.GetValue<string>() ?? null;
+            var num = entry?["Data"]?["num_circuits"]?.GetValue<string>() ?? "0";
+
+            if (!int.TryParse(num, out var numInt))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(rId) || string.IsNullOrEmpty(sId))
+                continue;
+
+            i++;
+            _logger.LogInformation("Executing {methodName} step {i} of {jsonRows.Count}", methodName, i, jsonRows.Count);
+
+            for (var j = 1; j < numInt + 1; j++)
+            {
+                _logger.LogInformation("Executing {methodName} step {i} substep {j} of {numInt}", methodName, i, j, numInt);
+
+                var response = await _protocol.SendCommandAsync(
+                    "read_condenser",
+                    new Dictionary<string, string>() { ["rack_id"] = rId, ["suction_id"] = sId, ["circuit_id"] = j.ToString() },
+                    ct
+                );
+
+                if (response is null)
+                    continue;
+
+                var result = BareParse($"circuit:rackId{rId}:suctId{sId}:circId{j}", response);
+                outArr.Add(result["data"]![0]!.DeepClone());
+            }
+
+        }
+
         var jsonWrap = new JsonObject();
         jsonWrap["data"] = outArr.DeepClone();
         return jsonWrap;
