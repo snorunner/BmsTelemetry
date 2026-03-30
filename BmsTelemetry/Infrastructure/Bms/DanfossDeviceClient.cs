@@ -40,8 +40,8 @@ public sealed class DanfossDeviceClient : IBmsClient
 
         // Test new commands
         yield return new ClientCommand(
-            "ReadCircuitAsync",
-            ct => ReadCircuitAsync(ct)
+            "ReadMetersAsync",
+            ct => ReadMetersAsync(ct)
         );
     }
 
@@ -86,6 +86,11 @@ public sealed class DanfossDeviceClient : IBmsClient
             "ReadCondenserAsync",
             ct => ReadCondenserAsync(ct)
         );
+
+        yield return new ClientCommand(
+            "ReadCircuitAsync",
+            ct => ReadCircuitAsync(ct)
+        );
     }
 
     private IEnumerable<ClientCommand> GetContinuousCommands()
@@ -118,6 +123,11 @@ public sealed class DanfossDeviceClient : IBmsClient
         yield return new ClientCommand(
             "ReadLightingZoneAsync",
             ct => ReadLightingZoneAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadMetersAsync",
+            ct => ReadMetersAsync(ct)
         );
     }
 
@@ -456,6 +466,15 @@ public sealed class DanfossDeviceClient : IBmsClient
         return jsonWrap;
     }
 
+    private async Task<JsonNode?> ReadMetersAsync(CancellationToken ct)
+    {
+        var response = await _protocol.SendCommandAsync("read_meters", null, ct);
+        if (response is null)
+            return null;
+
+        return BareParse("meters", response);
+    }
+
     // Helper methods
     private JsonObject BareParse(string deviceKey, JsonNode data)
     {
@@ -567,24 +586,4 @@ public sealed class DanfossDeviceClient : IBmsClient
         root["data"] = dataArray;
         return root;
     }
-
-    private void ConsolePrettyPrint(JsonNode obj)
-    {
-        try
-        {
-            var pretty = obj.ToJsonString(new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-
-            Console.WriteLine("=== JSON ===");
-            Console.WriteLine(pretty);
-            Console.WriteLine("============");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to pretty print JSON: {ex.Message}");
-        }
-    }
-
 }
