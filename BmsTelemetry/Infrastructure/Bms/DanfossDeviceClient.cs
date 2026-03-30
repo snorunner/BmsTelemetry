@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
+using System.Xml;
+using System.Xml.Linq;
 
 public sealed class DanfossDeviceClient : IBmsClient
 {
@@ -23,26 +25,26 @@ public sealed class DanfossDeviceClient : IBmsClient
     public async IAsyncEnumerable<ClientCommand> GetPollingSequenceAsync(
         [EnumeratorCancellation] CancellationToken ct)
     {
-        // if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
-        // {
-        //     foreach (var cmd in GetInitCommands())
-        //     {
-        //         yield return cmd;
-        //     }
-        //
-        //     _lastInitTime = DateTime.UtcNow;
-        // }
-        //
-        // foreach (var cmd in GetContinuousCommands())
-        // {
-        //     yield return cmd;
-        // }
+        if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
+        {
+            foreach (var cmd in GetInitCommands())
+            {
+                yield return cmd;
+            }
+
+            _lastInitTime = DateTime.UtcNow;
+        }
+
+        foreach (var cmd in GetContinuousCommands())
+        {
+            yield return cmd;
+        }
 
         // Test new commands
-        yield return new ClientCommand(
-            "AlarmDetailAsync",
-            ct => AlarmDetailAsync(ct)
-        );
+        // yield return new ClientCommand(
+        //     "ReadVarOutAsync",
+        //     ct => ReadVarOutAsync(ct)
+        // );
     }
 
     private IEnumerable<ClientCommand> GetInitCommands()
@@ -133,6 +135,26 @@ public sealed class DanfossDeviceClient : IBmsClient
         yield return new ClientCommand(
             "AlarmDetailAsync",
             ct => AlarmDetailAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadSensorAsync",
+            ct => ReadSensorAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadInputAsync",
+            ct => ReadInputAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadRelayAsync",
+            ct => ReadRelayAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "ReadVarOutAsync",
+            ct => ReadVarOutAsync(ct)
         );
     }
 
@@ -515,6 +537,178 @@ public sealed class DanfossDeviceClient : IBmsClient
         return BareParse($"alarm:ref{alarmRef}", response);
     }
 
+    private async Task<JsonNode?> ReadSensorAsync(CancellationToken ct)
+    {
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadSensorsAsync", ct);
+
+        var addresses = new List<(string node, string mod, string point)>();
+
+        foreach (var entry in jsonRows)
+        {
+            var node = entry?["Data"]?["node"]?.GetValue<string>() ?? null;
+            var mod = entry?["Data"]?["mod"]?.GetValue<string>() ?? null;
+            var point = entry?["Data"]?["point"]?.GetValue<string>() ?? null;
+
+            if (string.IsNullOrEmpty(node) || string.IsNullOrEmpty(mod) || string.IsNullOrEmpty(point))
+                continue;
+
+            addresses.Add((node, mod, point));
+        }
+
+        var response = await _protocol.SendCommandWithBodyAsync(
+            "read_sensor",
+            new Dictionary<string, string>() { ["valid_only"] = "1" },
+            element =>
+            {
+                foreach (var (node, mod, point) in addresses)
+                {
+                    element.Add(
+                        new XElement("sensor",
+                            new XAttribute("node", node),
+                            new XAttribute("mod", mod),
+                            new XAttribute("point", point)
+                        )
+                    );
+                }
+            },
+            ct
+        );
+
+        if (response is null)
+            return null;
+
+        return InjectedAtNodetypeParse("2", "sensor", response);
+    }
+
+    private async Task<JsonNode?> ReadInputAsync(CancellationToken ct)
+    {
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadInputsAsync", ct);
+
+        var addresses = new List<(string node, string mod, string point)>();
+
+        foreach (var entry in jsonRows)
+        {
+            var node = entry?["Data"]?["node"]?.GetValue<string>() ?? null;
+            var mod = entry?["Data"]?["mod"]?.GetValue<string>() ?? null;
+            var point = entry?["Data"]?["point"]?.GetValue<string>() ?? null;
+
+            if (string.IsNullOrEmpty(node) || string.IsNullOrEmpty(mod) || string.IsNullOrEmpty(point))
+                continue;
+
+            addresses.Add((node, mod, point));
+        }
+
+        var response = await _protocol.SendCommandWithBodyAsync(
+            "read_input",
+            new Dictionary<string, string>() { ["valid_only"] = "1" },
+            element =>
+            {
+                foreach (var (node, mod, point) in addresses)
+                {
+                    element.Add(
+                        new XElement("input",
+                            new XAttribute("node", node),
+                            new XAttribute("mod", mod),
+                            new XAttribute("point", point)
+                        )
+                    );
+                }
+            },
+            ct
+        );
+
+        if (response is null)
+            return null;
+
+        return InjectedAtNodetypeParse("0", "input", response);
+    }
+
+    private async Task<JsonNode?> ReadRelayAsync(CancellationToken ct)
+    {
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadRelaysAsync", ct);
+
+        var addresses = new List<(string node, string mod, string point)>();
+
+        foreach (var entry in jsonRows)
+        {
+            var node = entry?["Data"]?["node"]?.GetValue<string>() ?? null;
+            var mod = entry?["Data"]?["mod"]?.GetValue<string>() ?? null;
+            var point = entry?["Data"]?["point"]?.GetValue<string>() ?? null;
+
+            if (string.IsNullOrEmpty(node) || string.IsNullOrEmpty(mod) || string.IsNullOrEmpty(point))
+                continue;
+
+            addresses.Add((node, mod, point));
+        }
+
+        var response = await _protocol.SendCommandWithBodyAsync(
+            "read_relay",
+            null,
+            element =>
+            {
+                foreach (var (node, mod, point) in addresses)
+                {
+                    element.Add(
+                        new XElement("relay",
+                            new XAttribute("node", node),
+                            new XAttribute("mod", mod),
+                            new XAttribute("point", point)
+                        )
+                    );
+                }
+            },
+            ct
+        );
+
+        if (response is null)
+            return null;
+
+        return InjectedAtNodetypeParse("1", "relay", response);
+    }
+
+    private async Task<JsonNode?> ReadVarOutAsync(CancellationToken ct)
+    {
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(ip: _ip, source: "ReadVarOutsAsync", ct);
+
+        var addresses = new List<(string node, string mod, string point)>();
+
+        foreach (var entry in jsonRows)
+        {
+            var node = entry?["Data"]?["node"]?.GetValue<string>() ?? null;
+            var mod = entry?["Data"]?["mod"]?.GetValue<string>() ?? null;
+            var point = entry?["Data"]?["point"]?.GetValue<string>() ?? null;
+
+            if (string.IsNullOrEmpty(node) || string.IsNullOrEmpty(mod) || string.IsNullOrEmpty(point))
+                continue;
+
+            addresses.Add((node, mod, point));
+        }
+
+        var response = await _protocol.SendCommandWithBodyAsync(
+            "read_var_out",
+            null,
+            element =>
+            {
+                foreach (var (node, mod, point) in addresses)
+                {
+                    element.Add(
+                        new XElement("var_output",
+                            new XAttribute("node", node),
+                            new XAttribute("mod", mod),
+                            new XAttribute("point", point)
+                        )
+                    );
+                }
+            },
+            ct
+        );
+
+        if (response is null)
+            return null;
+
+        return InjectedAtNodetypeParse("3", "var_output", response);
+    }
+
     // Helper methods
     private JsonObject BareParse(string deviceKey, JsonNode data)
     {
@@ -548,6 +742,38 @@ public sealed class DanfossDeviceClient : IBmsClient
             var node = entry["node"]?.GetValue<string>() ?? "?";
             var mod = entry["mod"]?.GetValue<string>() ?? "?";
             var point = entry["point"]?.GetValue<string>() ?? "?";
+
+            var normalized = NormalizerService.Normalize(entry);
+
+            var obj = new JsonObject
+            {
+                ["device_key"] = $"nt{nodeType}:n{node}:m{mod}:p{point}",
+                ["data"] = normalized.DeepClone()
+            };
+
+            dataArray.Add(obj);
+        }
+
+        root["data"] = dataArray;
+        return root;
+    }
+
+    private JsonObject InjectedAtNodetypeParse(string nodeType, string subKey, JsonNode data)
+    {
+        var jsonResponse = data["resp"]?.AsObject() ?? new JsonObject();
+        var subarr = jsonResponse[subKey] as JsonArray ?? new JsonArray();
+
+        var root = new JsonObject();
+        var dataArray = new JsonArray();
+
+        foreach (var entryNode in subarr)
+        {
+            if (entryNode is not JsonObject entry)
+                continue;
+
+            var node = entry["@node"]?.GetValue<string>() ?? "?";
+            var mod = entry["@mod"]?.GetValue<string>() ?? "?";
+            var point = entry["@point"]?.GetValue<string>() ?? "?";
 
             var normalized = NormalizerService.Normalize(entry);
 
