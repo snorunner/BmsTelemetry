@@ -22,26 +22,26 @@ public sealed class E3DeviceClient : IBmsClient
 
     public async IAsyncEnumerable<ClientCommand> GetPollingSequenceAsync([EnumeratorCancellation] CancellationToken ct)
     {
-        // if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
-        // {
-        //     foreach (var cmd in GetInitCommands())
-        //     {
-        //         yield return cmd;
-        //     }
-        //
-        //     _lastInitTime = DateTime.UtcNow;
-        // }
-        //
-        // foreach (var cmd in GetContinuousCommands())
-        // {
-        //     yield return cmd;
-        // }
+        if (DateTime.UtcNow - _lastInitTime >= TimeSpan.FromMinutes(60))
+        {
+            foreach (var cmd in GetInitCommands())
+            {
+                yield return cmd;
+            }
+
+            _lastInitTime = DateTime.UtcNow;
+        }
+
+        foreach (var cmd in GetContinuousCommands())
+        {
+            yield return cmd;
+        }
 
         // Test new commands
-        yield return new ClientCommand(
-            "GetAlarmsAsync",
-            ct => GetAlarmsAsync(ct)
-        );
+        // yield return new ClientCommand(
+        //     "GetAlarmsAsync",
+        //     ct => GetAlarmsAsync(ct)
+        // );
     }
 
     private IEnumerable<ClientCommand> GetInitCommands()
@@ -57,6 +57,11 @@ public sealed class E3DeviceClient : IBmsClient
         yield return new ClientCommand(
             "GetAppDescriptionAsync",
             ct => GetAppDescriptionAsync(ct)
+        );
+
+        yield return new ClientCommand(
+            "GetAlarmsAsync",
+            ct => GetAlarmsAsync(ct)
         );
     }
 
