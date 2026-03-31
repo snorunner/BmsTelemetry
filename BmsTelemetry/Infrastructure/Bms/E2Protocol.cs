@@ -60,6 +60,13 @@ public class E2Protocol
     private async Task<JsonNode?> TranslateAsync(HttpResponseMessage response)
     {
         var json = await response.Content.ReadAsStringAsync();
-        return JsonNode.Parse(json);
+        try
+        {
+            return JsonNode.Parse(json);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

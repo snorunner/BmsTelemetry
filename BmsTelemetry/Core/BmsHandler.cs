@@ -127,6 +127,7 @@ public class BmsHandler : IBmsHandler
             ConsecutiveFailures++;
             LastFailure = DateTime.UtcNow;
             Connection = ConnectionStatus.Disconnected;
+            await TryScheduleNextPollStep(ct);
             return;
         }
 
@@ -139,7 +140,10 @@ public class BmsHandler : IBmsHandler
 
         var dataArray = json["data"] as JsonArray;
         if (dataArray is null)
+        {
+            await TryScheduleNextPollStep(ct);
             return;
+        }
 
         var incomingItems = new List<TelemetryRecord>();
         foreach (var item in dataArray)
@@ -163,7 +167,10 @@ public class BmsHandler : IBmsHandler
         }
 
         if (!incomingItems.Any())
+        {
+            await TryScheduleNextPollStep(ct);
             return;
+        }
 
         // BULK UPSERT
         await db.BulkInsertOrUpdateAsync(incomingItems, cancellationToken: ct);

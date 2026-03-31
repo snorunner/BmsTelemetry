@@ -97,13 +97,20 @@ public class DanfossProtocol
 
     private async Task<JsonNode?> TranslateAsync(HttpResponseMessage response)
     {
-        var xmlString = await response.Content.ReadAsStringAsync();
+        try
+        {
+            var xmlString = await response.Content.ReadAsStringAsync();
 
-        var xmlDoc = new XmlDocument();
-        xmlDoc.LoadXml(xmlString);
+            var xmlDoc = new XmlDocument();
+            xmlDoc.LoadXml(xmlString);
 
-        var jsonText = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xmlDoc);
+            var jsonText = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xmlDoc);
 
-        return JsonNode.Parse(jsonText);
+            return JsonNode.Parse(jsonText);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
