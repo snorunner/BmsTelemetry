@@ -9,20 +9,12 @@ public static class IotDeviceExtensions
         if (env.IsDevelopment())
         {
             // services.AddSingleton<IIotDevice, ConsoleIotDevice>();
-            // services.AddSingleton<IIotDevice, FileIotDevice>();
             // services.AddSingleton<IIotDevice, VoidIotDevice>();
             services.AddSingleton<IIotDevice, AzureIotDevice>();
             return;
         }
 
         // Production logic
-        if (generalSettings?.use_cloud ?? true)
-        {
-            services.AddSingleton<IIotDevice, AzureIotDevice>();
-        }
-        else
-        {
-            services.AddSingleton<IIotDevice>(new FileIotDevice("localmessages.jsonl"));
-        }
+        services.AddSingleton<IIotDevice, AzureIotDevice>();
     }
 }

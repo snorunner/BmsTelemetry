@@ -2,7 +2,8 @@
     <div>
         <ConnectionStatusLight Status="@IotDevice.Connected" /> Connection: @IotDevice.Connected
     </div>
-    <p>Type: IoT edge device</p>
+    <p>Type: @IotDevice.Type</p>
+    <p>Total messages sent: @IotDevice.TotalMessagesSent</p>
 </div>
 
 @code {

@@ -15,6 +15,8 @@ public sealed class AzureIotDevice : IIotDevice, IAsyncDisposable
     private DeviceClient? _deviceClient;
 
     public ConnectionStatus Connected { get; private set; }
+    public int TotalMessagesSent { get; private set; } = 0;
+    public string Type { get; init; } = "Azure IoT edge device";
 
     public AzureIotDevice(DpsService dpsService, ILogger<AzureIotDevice> logger)
     {
@@ -149,6 +151,7 @@ public sealed class AzureIotDevice : IIotDevice, IAsyncDisposable
             {
                 await _deviceClient!.SendEventAsync(message, ct);
                 _logger.LogInformation("Message sent to Azure IotHub successfully");
+                TotalMessagesSent++;
                 await Task.Delay(TimeSpan.FromMilliseconds(200), ct);
             }
             catch (IotHubException ex)
