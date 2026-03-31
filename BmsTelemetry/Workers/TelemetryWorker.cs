@@ -7,6 +7,7 @@ public sealed class TelemetryWorker : BackgroundService
     private readonly ILogger<TelemetryWorker> _logger;
 
     private DateTime _lastFullFrameTime = DateTime.MinValue;
+    private DateTime _lastDbCleanTime = DateTime.UtcNow;
 
     public TelemetryWorker(IIotDevice iotDevice, DbReader dbReader, ILogger<TelemetryWorker> logger)
     {
@@ -40,6 +41,11 @@ public sealed class TelemetryWorker : BackgroundService
             }
 
             await _iotDevice.SendMessageAsync(dataToSend, stoppingToken);
+
+            if (DateTime.UtcNow - _lastFullFrameTime >= TimeSpan.FromHours(24))
+            {
+                await _dbReader.CleanDbAsync(stoppingToken);
+            }
         }
     }
 }

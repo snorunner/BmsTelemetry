@@ -25,6 +25,15 @@ public class DbReader
         ", ct);
     }
 
+    public async Task CleanDbAsync(CancellationToken ct = default)
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM TelemetrySnapshot;", ct);
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM Telemetry;", ct);
+    }
+
     public async Task<JsonArray> GetDeltaAsync(CancellationToken ct = default)
     {
         using var scope = _serviceScopeFactory.CreateScope();
