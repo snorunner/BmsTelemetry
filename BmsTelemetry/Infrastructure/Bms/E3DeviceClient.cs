@@ -39,8 +39,8 @@ public sealed class E3DeviceClient : IBmsClient
 
         // Test new commands
         yield return new ClientCommand(
-            "GetAppDescriptionAsync",
-            ct => GetAppDescriptionAsync(ct)
+            "GetAlarmsAsync",
+            ct => GetAlarmsAsync(ct)
         );
     }
 
@@ -55,8 +55,8 @@ public sealed class E3DeviceClient : IBmsClient
     private IEnumerable<ClientCommand> GetContinuousCommands()
     {
         yield return new ClientCommand(
-            "GetSystemInventoryAsync",
-            ct => GetSystemInventoryAsync(ct)
+            "GetAppDescriptionAsync",
+            ct => GetAppDescriptionAsync(ct)
         );
     }
 
@@ -203,6 +203,70 @@ public sealed class E3DeviceClient : IBmsClient
         }
 
         var outObj = new JsonObject { ["data"] = dataArr.DeepClone() };
+
+        return outObj;
+    }
+
+    private async Task<JsonNode?> GetAlarmsAsync(CancellationToken ct)
+    {
+        var sidOk = await EnsureSessionIdAsync(ct);
+        if (!sidOk)
+            return null;
+
+        var response = await _protocol.SendCommandAsync(
+            "GetAlarms",
+            new JsonObject { ["sid"] = _sessionId },
+            ct,
+            HttpMethod.Post
+        );
+
+        if (response is null)
+        {
+            _sessionId = string.Empty;
+            return null;
+        }
+
+        // Validate JSON structure
+        var result = response["result"] as JsonObject;
+        if (result is null)
+        {
+            _sessionId = string.Empty;
+            return null;
+        }
+
+        var alarms = result["alarms"] as JsonArray;
+        if (alarms is null)
+        {
+            _sessionId = string.Empty;
+            return null;
+        }
+
+        var outArr = new JsonArray();
+        foreach (var entry in alarms)
+        {
+            var advId = entry?["advinstanceid"]?.GetValue<string>();
+
+            if (string.IsNullOrEmpty(advId))
+                continue;
+
+            var data = NormalizerService.Normalize(entry?.AsObject());
+
+            if (data is null)
+                continue;
+
+            var thisData = new JsonObject
+            {
+                ["device_key"] = $"alarm{advId}",
+                ["data"] = data.DeepClone()
+            };
+
+            outArr.Add(thisData);
+        }
+
+        var outObj = new JsonObject
+        {
+            ["data"] = outArr.DeepClone()
+        };
 
         return outObj;
     }
