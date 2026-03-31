@@ -116,8 +116,9 @@ public class BmsHandler : IBmsHandler
         {
             json = await cmd.Action(ct);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "An error occurred in the step");
             // let json stay null and fail in next step
         }
 

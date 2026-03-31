@@ -39,8 +39,8 @@ public sealed class E3DeviceClient : IBmsClient
 
         // Test new commands
         yield return new ClientCommand(
-            "GetSystemInventoryAsync",
-            ct => GetSystemInventoryAsync(ct)
+            "GetAppDescriptionAsync",
+            ct => GetAppDescriptionAsync(ct)
         );
     }
 
@@ -117,6 +117,92 @@ public sealed class E3DeviceClient : IBmsClient
         {
             ["data"] = outArr
         };
+
+        return outObj;
+    }
+
+
+    private async Task<JsonNode?> GetAppDescriptionAsync(CancellationToken ct)
+    {
+        var sidOk = await EnsureSessionIdAsync(ct);
+        if (!sidOk)
+            return null;
+
+        // Load cached system inventory rows
+        var jsonRows = await _dbReader.GetHotRowsAsJsonAsync(
+            ip: _ip,
+            source: "GetSystemInventoryAsync",
+            ct
+        );
+
+        var dataArr = new JsonArray();
+
+        int i = 1;
+        string methodName = "GetAppDescriptionAsync";
+        foreach (var entry in jsonRows)
+        {
+            _logger.LogInformation("Executing {methodName} step {i} of {Count}", methodName, i, jsonRows.Count);
+
+            var iid = entry?["Data"]?["iid"]?.GetValue<string>() ?? string.Empty;
+            var appname = entry?["Data"]?["appname"]?.GetValue<string>() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(iid) || string.IsNullOrEmpty(appname))
+                continue;
+
+            // Call GetAppDescription
+            var response = await _protocol.SendCommandAsync(
+                "GetAppDescription",
+                new JsonObject { ["sid"] = _sessionId, ["iid"] = iid },
+                ct,
+                HttpMethod.Post
+            );
+
+            if (response is null)
+            {
+                _sessionId = string.Empty;
+                return null;
+            }
+
+            // Extract points array
+            var points = response["result"]?["points"] as JsonArray;
+            if (points is null)
+            {
+                _sessionId = string.Empty;
+                return null;
+            }
+
+            var thisEntry = new JsonObject { ["device_key"] = $"app{appname}", ["data"] = new JsonObject() };
+
+            foreach (var point in points)
+            {
+                if (point is not JsonObject pointObj)
+                    continue;
+
+                // Extract name + val
+                var name = pointObj["name"]?.GetValue<string>();
+                string val;
+
+                try
+                {
+                    val = pointObj["val"]?.GetValue<string>() ?? "nullString";
+                }
+                catch
+                {
+                    val = "invalidData";
+                }
+
+                if (name is null || val is null)
+                    continue;
+
+                thisEntry["data"]![name] = val;
+            }
+
+            dataArr.Add(thisEntry.DeepClone());
+
+            i++;
+        }
+
+        var outObj = new JsonObject { ["data"] = dataArr.DeepClone() };
 
         return outObj;
     }
