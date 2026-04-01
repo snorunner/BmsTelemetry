@@ -25,7 +25,7 @@ public sealed class DanfossDeviceClient : BaseDeviceClient
         {
             // poll
             _sensors = await ReadSensorsAsync(ct);
-            await Task.Delay(10_000);
+            await Task.Delay(10_000, ct);
         }
         //
         // need to add a worker to just do it and then print to console!
@@ -38,16 +38,29 @@ public sealed class DanfossDeviceClient : BaseDeviceClient
     private async Task<JsonNode?> ExecuteWithTracking(
         Func<Task<JsonNode?>> action)
     {
-        var result = await action();
-
-        if (result == null)
+        try
         {
+            var result = await action();
+
+            if (result == null)
+            {
+                RegisterFailure();
+                return null;
+            }
+
+            RegisterSuccess();
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // let cancellation propagate
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Request failed");
             RegisterFailure();
             return null;
         }
-
-        RegisterSuccess();
-        return result;
     }
 
     // Interaction methods

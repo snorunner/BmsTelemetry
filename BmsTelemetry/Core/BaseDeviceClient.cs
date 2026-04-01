@@ -27,7 +27,16 @@ public abstract class BaseDeviceClient : IBmsClient
         _cts.Cancel();
 
         if (_executionTask != null)
-            await _executionTask;
+        {
+            try
+            {
+                await _executionTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown
+            }
+        }
     }
 
     public event Action<ClientStatusUpdate>? OnStatusChanged;

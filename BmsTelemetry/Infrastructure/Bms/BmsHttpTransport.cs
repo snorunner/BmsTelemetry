@@ -77,6 +77,8 @@ public class BmsHttpTransport : IBmsTransport
 
         return new SocketsHttpHandler
         {
+            ConnectTimeout = TimeSpan.FromSeconds(
+                _generalSettings.http_timeout_delay_seconds),
             PooledConnectionLifetime = _generalSettings.keep_alive
                 ? TimeSpan.FromMinutes(10)
                 : TimeSpan.Zero,
