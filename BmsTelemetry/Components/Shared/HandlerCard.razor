@@ -1,26 +1,30 @@
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow duration-200">
+<div
+    class="bg-white rounded-xl shadow-sm border border-gray-200 px-8 py-4 hover:shadow-md transition-shadow duration-200">
     <!-- Header -->
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-lg font-semibold text-gray-900">
             @BmsHandler.DeviceType
         </h3>
-
-        <!-- Status badge placeholder -->
-        <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded-full @(BmsHandler.Connection == ConnectionStatus.Connected ? "bg-green-500" : "bg-red-500")"></div>
-            <span class="text-sm text-gray-600">@BmsHandler.Status</span>
-        </div>
     </div>
 
     <!-- Body -->
     <div class="space-y-1">
-        <p class="text-sm text-gray-500">
+        <p class="text-sm">
             <span class="font-medium text-gray-700">IP:</span> @BmsHandler.DeviceIP
         </p>
 
-        <p class="text-sm text-gray-500">
+        <p class="text-sm">
+            <span class="font-medium text-gray-700">Status:</span> @BmsHandler.Status
+        </p>
+
+        <p class="text-sm">
             <span class="font-medium text-gray-700">Fails:</span> @BmsHandler.ConsecutiveFailures
         </p>
+
+        <div class="flex justify-center gap-x-5">
+            <button class="rounded-xl py-1 px-3 bg-green-200 hover:bg-sky-500">Start</button>
+            <button class="rounded-xl py-1 px-3 bg-red-200 hover:bg-sky-500">Stop</button>
+        </div>
     </div>
 </div>
 
