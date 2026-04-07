@@ -180,6 +180,7 @@ public sealed class E2DeviceClient : IBmsClient
         int i = 1;
         string methodName = "GetMultiExpandedStatusAsync";
 
+        bool anySuccess = false;
         foreach (var entry in jsonRows)
         {
             _logger.LogInformation("Executing {methodName} step {i} of {jsonRows.Count}", methodName, i, jsonRows.Count);
@@ -212,6 +213,8 @@ public sealed class E2DeviceClient : IBmsClient
 
             if (response is null)
                 continue;
+
+            anySuccess = true;
 
             // NormalizerService.ConsolePrettyPrint(response);
 
@@ -283,6 +286,9 @@ public sealed class E2DeviceClient : IBmsClient
         }
 
         var result = new JsonObject { ["data"] = outArr };
+
+        if (!anySuccess)
+            return null;
 
         return result;
     }
