@@ -11,6 +11,7 @@ builder.AddAppLogging();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddControllers();
 
 builder.Services.AddCertificateSource(builder.Environment);
 builder.Services.AddIotDevice(builder.Configuration, builder.Environment);
@@ -48,5 +49,6 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+app.MapControllers();
 
 app.Run();
