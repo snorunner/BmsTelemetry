@@ -23,8 +23,12 @@
     <PackageReference Include="Microsoft.Azure.Devices.Client" Version="1.42.3" />
     <PackageReference Include="Microsoft.Azure.Devices.Provisioning.Client" Version="1.19.4" />
     <PackageReference Include="Microsoft.Azure.Devices.Provisioning.Transport.Mqtt" Version="1.17.5" />
+<<<<<<< HEAD
+
+=======
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.5" />
+>>>>>>> upstream/main
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
