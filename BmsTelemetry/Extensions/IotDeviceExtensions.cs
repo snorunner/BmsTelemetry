@@ -8,8 +8,8 @@ public static class IotDeviceExtensions
         // Development override
         if (env.IsDevelopment())
         {
-            // services.AddSingleton<IIotDevice, ConsoleIotDevice>();
-            services.AddSingleton<IIotDevice, VoidIotDevice>();
+            services.AddSingleton<IIotDevice, ConsoleIotDevice>();
+            // services.AddSingleton<IIotDevice, VoidIotDevice>();
             // services.AddSingleton<IIotDevice, AzureIotDevice>();
             return;
         }

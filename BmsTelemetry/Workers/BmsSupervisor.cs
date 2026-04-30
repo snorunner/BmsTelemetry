@@ -56,15 +56,15 @@ public class BmsSupervisor : BackgroundService
     private JsonObject BuildHealthPayload(IBmsHandler handler)
     {
         var payload = new JsonObject();
-        payload["ip"] = handler.DeviceIP;
-        payload["device_key"] = $"{handler.DeviceType}:HealthTelemetry";
+        payload["Ip"] = handler.DeviceIP;
+        payload["DeviceKey"] = $"{handler.DeviceType}:HealthTelemetry";
 
         var dataobj = new JsonObject();
         dataobj["LastSuccess"] = handler.LastSuccess.ToUniversalTime();
         dataobj["LastFailure"] = handler.LastFailure.ToUniversalTime();
         dataobj["ConsecutiveFailures"] = handler.ConsecutiveFailures;
         dataobj["Status"] = handler.Status.ToString();
-        payload["data"] = dataobj;
+        payload["Data"] = dataobj;
 
         return payload;
     }

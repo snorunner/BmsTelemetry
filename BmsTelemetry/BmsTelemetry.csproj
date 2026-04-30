@@ -7,7 +7,7 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
 
     <!-- Versioning -->
-    <Version>0.0.1</Version>
+    <Version>0.1.1</Version>
     <Authors>Henry West</Authors>
     <Description>Unified IoT bridge for BMS telemetry</Description>
     <Product>BmsTelemetry</Product>
